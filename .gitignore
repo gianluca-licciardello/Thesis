@@ -1,0 +1,39 @@
+# Python environments and generated caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+# Local editor settings and secrets
+.vscode/
+.idea/
+.claude/
+.env
+.env.*
+.DS_Store
+# Datasets, estimations, trained weights, and generated outputs
+data/
+preprocessed*/
+outputs/
+results*/
+*.npy
+*.npz
+*.pth
+*.pt
+*.ckpt
+*.log
+*.status
+*.status.json
+*.lock
+# Backups, papers, and local experiment tooling
+*.orig
+*.bak
+*.pdf
+recovery/
+diagnostics/
