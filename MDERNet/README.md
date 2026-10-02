@@ -1,125 +1,149 @@
-# MDERNet on AIDE with Fast SAM3D estimations
+# MDERNet: current AIDE and PPB-Emo experiments
 
-This directory packages the AIDE pipeline from MDERNet: a facial expression
-branch (FEB), a body gesture branch (BGB), and their fusion. It consumes existing
-Fast SAM3D estimations; it does not generate estimations or crop raw videos.
+Use `current/run_subsets.py` for AIDE Clean Keypoints, AIDE Balanced, PPB-Emo
+EEG, EPQ, and Cluster. It packages the training/model code from the active
+September 30 campaign and the configuration-first continuation. The older
+root-level `ablation_aide.py` is retained for historical use and does **not**
+implement this evaluation protocol.
 
-## Setup
+## Environment
 
-Use Python 3.10 or 3.11. Run all commands below from this directory:
+Linux, Python 3.10 or 3.11, and a CUDA-capable NVIDIA GPU are required for
+training. Input validation can run on CPU. From `Thesis/MDERNet`:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
+python -m pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cu121
 python -m pip install -r requirements.txt
 ```
 
-For CUDA 12.1, install the matching PyTorch wheels before the requirements:
+## Exact settings
 
-```bash
-python -m pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cu121
-```
+| Setting | Value |
+|---|---|
+| Epochs / seed / dropout | 50 / 42 for every fit / 0.0 |
+| Batch size | 64 |
+| Optimizer | SGD, LR 0.01, momentum 0.9, Nesterov, weight decay 0.0001 |
+| Scheduler | CosineAnnealingWarmRestarts, T_0=5, eta_min=0.00001 |
+| Backbone | Dominik ResNet-18; checked weight mapping; fully fine-tuned |
+| Input | 30 grayscale 112×112 faces; 15 body joints; xyz, original visibility, seven validity-masked bones |
+| Cross-validation | 10 folds: test i, validation (i+1)%10, remaining 8 train |
+| Checkpoint selection | Validation macro-accuracy, then macro F1; earliest exact tie |
+| AIDE loss | Cross entropy + soft macro F1 |
+| PPB-Emo loss | Cross entropy + 0.1 MSE + CCC |
 
-CUDA is used automatically when available; `--device cpu` selects CPU training.
-A CUDA GPU is recommended. Lower `--batch_size` if GPU memory is limited.
-The face-cropping dependency facenet-pytorch is unnecessary for this pipeline
-because the input faces are already cropped.
+AIDE uses stratified clip folds. PPB defaults to participant-independent folds;
+`--split mixed` uses stratified clip folds. Subset membership filters **training
+only**; validation and test keep their full held-out folds. EEG/EPQ/Cluster are
+clip-selection definitions, not additional EEG or questionnaire model inputs.
 
-## Required external inputs
+Each of the seven configurations runs all ten folds before the next configuration:
+FEB, FEB without FAM, FEB without FAM/FM, BGB without refinement, BGB without
+refinement/visibility, fusion with refinement, fusion without refinement.
+Then one FEB+BGB architecture is selected by mean validation macro-accuracy
+(and macro F1 tie-break) across ten folds and evaluated on all ten folds.
+An identical already-trained fusion is reused. Fixed-pair scores are
+post-selection estimates, not unbiased nested-CV estimates.
 
-Obtain the AIDE annotations, cropped faces, and corresponding Fast SAM3D outputs
-separately. Datasets, weights, and generated results are not included.
+**EPQ exception:** independent EPQ training folds contain 46–58 clips. The
+launcher keeps the smaller batch when a fold has fewer than 64 clips; retaining
+`drop_last=True` would otherwise produce no training batches. Other loader
+settings match the campaign. No training settings are inherited from the old
+root-level runner.
+
+## External files to share
+
+The Git repository contains code only. For exact reproduction, share this input
+bundle separately (approximately 4.6 GiB):
 
 ```text
-data/
-  AIDE/annotation/0001.json
-  AIDE_cropped/0001/incarframes/0.jpg
-  AIDE_cropped/0001/incarframes/1.jpg
-  ...
-  fastsam3d_aide/0001/incarframes.npz
+inputs/
+  resnet18_dominik.pth
+  aide_clean_keypoints_subset.json
+  aide_balanced_subset.json
+  subject_subsets.json
+  aide_body.npy
+  ppb_body.npy
+  aide/labels.csv
+  aide/faces/*.npy
+  ppb/labels.csv
+  ppb/faces/*.npy
+  data_manifest.json
 ```
 
-Use matching four-digit clip IDs. Each annotation contains `emotion_label`:
-`Anxiety`, `Peace`, `Weariness`, `Happiness`, or `Anger` (classes 0–4).
-Each NPZ contains `keypoints_3d`, a float array of shape `(T, 70, 3)` in
-MHR70 joint order. JPG basenames must be integers and sort in temporal order.
-Face and keypoint sequences must correspond frame for frame; preprocessing
-truncates both to the shorter length. Normally clips contain 45 frames.
+The bundled body arrays have shape `(N,30,15,4)` and follow the corresponding
+CSV row order exactly. They preserve the campaign's interpolation,
+normalization, and original visibility masks. Do not reorder the CSV rows.
+AIDE labels contain `clip_id,discrete_label`; PPB labels include `participant`,
+`emotion_code`, `discrete_label`, `valence`, `arousal`, and `dominance`.
 
-The preprocessor samples 30 frames, converts faces to equalised grayscale
-112×112 images, keeps 15 upper-body joints, normalises xyz per clip, and adds
-visibility from finite coordinates. Its outputs are `faces/*.npy`,
-`body/*.npy`, and `labels.csv`.
+The required backbone SHA-256 is
+`734341508e3ddbcd181e40da0173cf2c77cd0de3bc2455715cc1b7f42a63a6f6`.
+ImageNet weights are not an equivalent replacement for these experiments.
+
+The previously discussed AIDE annotations, cropped JPG faces, and raw Fast
+SAM3D estimations remain useful source data. The exact-cache workflow above
+uses their processed products instead. The older `preprocess_aide.py` does not
+reconstruct the campaign's interpolation/visibility policy; use the exported
+caches to reproduce the current tests. No raw EEG recordings, EPQ responses,
+driving telemetry, experiment logs, or historical trained models are needed
+when the exported inputs and subset definitions are available.
+
+## Export the input bundle on the original machine
+
+From this repository's `MDERNet` directory:
 
 ```bash
-python preprocess_aide.py \
-  --annotation_dir /path/to/AIDE/annotation \
-  --cropped_dir /path/to/AIDE_cropped \
-  --fastsam_dir /path/to/fastsam3d_aide \
-  --out_dir ./preprocessed_aide
+python current/export_inputs.py \
+  --source-root /data/gianluca/scripts/MDERNet \
+  --subset-root /data/gianluca/scripts/outputs/preprocessing \
+  --destination /data/gianluca/MDERNet-share-inputs
 ```
 
-Check the reported clip counts: missing faces or estimations cause clips to be
-skipped. Add `--overwrite` to regenerate an existing cache after input changes.
+The destination must be new. The exporter copies only required input files,
+checks the existing campaign hashes where available, verifies each copy, and
+writes a manifest with portable relative paths. Share this folder through your
+chosen file-transfer service. The recipient can put it anywhere.
 
-## Train and evaluate
+## Validate and run
 
-A short one-fold run of the body and fusion variants:
+Set the location of the received bundle:
 
 ```bash
-python ablation_aide.py --subset full --mder_only \
-  --preproc_dir ./preprocessed_aide --epochs 1 --fold_id 0 \
-  --batch_size 2 --no_pretrained --run_dir ./outputs/smoke
+export MDERNET_INPUTS=/path/to/MDERNet-share-inputs
+export CUDA_VISIBLE_DEVICES=0
+
+for dataset in aide_clean aide_balanced ppb_eeg ppb_epq ppb_cluster; do
+    python current/run_subsets.py --dataset "$dataset" \
+        --data-root "$MDERNET_INPUTS" --check-only || break
+done
 ```
 
-Run all variants across ten folds:
+Run all five sequentially:
 
 ```bash
-python ablation_aide.py --subset full --all_folds --epochs 100 \
-  --preproc_dir ./preprocessed_aide --batch_size 8 \
-  --run_dir ./outputs/aide_full
+for dataset in aide_clean aide_balanced ppb_eeg ppb_epq ppb_cluster; do
+    python -u current/run_subsets.py --dataset "$dataset" \
+        --data-root "$MDERNET_INPUTS" --split independent || break
+done
 ```
 
-By default the face backbone downloads ImageNet ResNet-18 weights. Use
-`--no_pretrained` to initialise randomly without a download, or
-`--pretrained_path /path/to/face_backbone.pth` for a compatible externally
-provided face checkpoint. Random or ImageNet initialisation does not reproduce
-experiments that used a different pretrained face checkpoint.
+For one dataset, for example PPB EEG with mixed-subject splits:
 
-Results (JSON, CSV, curves, and confusion matrices) are written beneath the run
-directory. Completed variants are cached: choose a new run directory when
-changing settings or inputs. This runner retains its best weights in memory;
-it does not export a trained checkpoint for later inference.
+```bash
+python -u current/run_subsets.py --dataset ppb_eeg --split mixed \
+    --data-root "$MDERNET_INPUTS"
+```
 
-The included runner uses clip-level stratified cross-validation and selects
-the best epoch using the held-out fold. It does not implement an independent
-validation/test split and should not be treated as reproducing the final
-validation campaign. AIDE has no VAD targets; dimensional metrics are not
-meaningful. The default ten folds require at least ten clips per emotion.
+Results are written under `outputs/current/<dataset-and-split>/`: manifest,
+status, fold splits, training histories, selected checkpoints, per-fold
+validation/test metrics and predictions, and selected-fusion metadata.
+Accuracy summaries can be computed as arithmetic means of the ten test-fold
+scores. Completed folds are reused on restart; an interrupted fold restarts
+from epoch one. The manifest rejects changed code/input bundles in an existing
+run directory; use `--output-root /new/output/location` for a separate run.
 
-## Paths and optional subsets
-
-Defaults are relative to this directory, independent of the working directory.
-Each path in `config.py` can be overridden before launch with its `MDERNET_`
-environment variable, for example `MDERNET_OUTPUT_DIR` or
-`MDERNET_AIDE_PREPROCESSED_DIR`. The preprocessing flags and training
-`--preproc_dir` allow explicit paths as shown above.
-
-`--subset full` needs no subset metadata. For `balanced` or `clean`, supply the
-original subset JSON through `MDERNET_AIDE_BALANCED_SUBSET` or
-`MDERNET_AIDE_CLEAN_SUBSET`. JSON format: `{"kept_clip_ids": ["0001", "0002"]}`.
-These subsets filter training clips only; held-out folds remain full.
-
-## Source files
-
-- `preprocess_aide.py`: aligned face and keypoint preprocessing.
-- `dataset_aide.py`: tensors, labels, and stratified folds.
-- `model.py`: shared MDERNet architecture, including the body branch.
-- `evaluate.py`: losses and metrics.
-- `ablation_aide.py`: AIDE training, ablations, and result figures.
-- `config.py`: architecture, training defaults, and configurable paths.
-
-Local portability changes replace machine-specific paths and pass
-`--preproc_dir` through to the training datasets. The original model and
-experimental protocol are otherwise retained.
+The launcher never starts or stops the original campaign services. Avoid
+launching it on a GPU already occupied by the current experiments.
