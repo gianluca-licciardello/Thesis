@@ -34,10 +34,19 @@ python -m pip install -r requirements.txt
 | AIDE loss | Cross entropy + soft macro F1 |
 | PPB-Emo loss | Cross entropy + 0.1 MSE + CCC |
 
-AIDE uses stratified clip folds. PPB defaults to participant-independent folds;
-`--split mixed` uses stratified clip folds. Subset membership filters **training
-only**; validation and test keep their full held-out folds. EEG/EPQ/Cluster are
-clip-selection definitions, not additional EEG or questionnaire model inputs.
+AIDE uses stratified clip folds. PPB-Emo supports two evaluation conditions:
+
+- **Subject-independent** (`--split independent`, the default): participants
+  are disjoint across training, validation, and test sets.
+- **Mixed** (`--split mixed`): stratified clip folds allow clips from the same
+  participant to appear in training, validation, and test sets.
+
+Both conditions use the same ten-fold 8/1/1 protocol and training settings.
+Each PPB subset must be run once per condition to evaluate both. AIDE has no
+participant-independent option; `--split` only affects PPB-Emo.
+Subset membership filters **training only**; validation and test keep their
+full held-out folds. EEG/EPQ/Cluster are clip-selection definitions, not
+additional EEG or questionnaire model inputs.
 
 Each of the seven configurations runs all ten folds before the next configuration:
 FEB, FEB without FAM, FEB without FAM/FM, BGB without refinement, BGB without
@@ -121,21 +130,43 @@ for dataset in aide_clean aide_balanced ppb_eeg ppb_epq ppb_cluster; do
 done
 ```
 
-Run all five sequentially:
+Run the two AIDE subsets sequentially:
 
 ```bash
-for dataset in aide_clean aide_balanced ppb_eeg ppb_epq ppb_cluster; do
+for dataset in aide_clean aide_balanced; do
     python -u current/run_subsets.py --dataset "$dataset" \
-        --data-root "$MDERNET_INPUTS" --split independent || break
+        --data-root "$MDERNET_INPUTS" || break
 done
 ```
 
-For one dataset, for example PPB EEG with mixed-subject splits:
+Run EEG, EPQ, and Cluster under **both** PPB-Emo conditions (six runs,
+executed sequentially). The earlier five-dataset command with
+`--split independent` runs only the independent condition.
+
+```bash
+for split in independent mixed; do
+    for dataset in ppb_eeg ppb_epq ppb_cluster; do
+        python -u current/run_subsets.py --dataset "$dataset" \
+            --split "$split" --data-root "$MDERNET_INPUTS" || break 2
+    done
+done
+```
+
+To validate both conditions before training, add `--check-only` to the Python
+command in this loop. The initial validation loop above checks PPB's default
+independent condition only.
+
+To run just one experiment, for example PPB EEG with mixed-subject splits:
 
 ```bash
 python -u current/run_subsets.py --dataset ppb_eeg --split mixed \
     --data-root "$MDERNET_INPUTS"
 ```
+
+Conditions have separate result directories, for example
+`outputs/current/ppb_eeg_independent/` and `outputs/current/ppb_eeg_mixed/`.
+AIDE results use `outputs/current/aide_clean/` and
+`outputs/current/aide_balanced/`.
 
 Results are written under `outputs/current/<dataset-and-split>/`: manifest,
 status, fold splits, training histories, selected checkpoints, per-fold
