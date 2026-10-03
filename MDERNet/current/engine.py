@@ -147,7 +147,8 @@ def _fit(key,fold,variant,kind,kwargs,df,split,resources):
     loaders=[DataLoader(Samples(df,ix,aide,kind=='body'),batch_size=64,shuffle=i==0,drop_last=i==0,
                         num_workers=4,pin_memory=False,persistent_workers=True,generator=gen if i==0 else None) for i,ix in enumerate(split)]
     for loader in loaders:resources.callback(_close_loader,loader)
-    opt=torch.optim.SGD(model.parameters(),lr=.01,momentum=.9,nesterov=True,weight_decay=1e-4)
+    lr=.01 if key.startswith('aide') else .0001
+    opt=torch.optim.SGD(model.parameters(),lr=lr,momentum=.9,nesterov=True,weight_decay=1e-4)
     sched=torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(opt,T_0=5,eta_min=1e-5)
     best=(-1.,-1.);history=[];ckpt=dest/f'{variant}_fold_{fold:02d}_best.pt'
     for epoch in range(1,51):
@@ -170,7 +171,7 @@ def _fit(key,fold,variant,kind,kwargs,df,split,resources):
         print(key,variant,'fold',fold,'epoch',epoch,'loss',total/seen,'val_macro_accuracy',val['macro_accuracy'],flush=True)
     model.load_state_dict(torch.load(ckpt,map_location='cuda',weights_only=True))
     test,pred=evaluate(model,kind,loaders[2],aide)
-    result=dict(variant=variant,fold=fold,seed=42,best_epoch=best_epoch,validation=best_val,test=test,predictions=pred,kwargs=kwargs,checkpoint=str(ckpt.relative_to(HERE)))
+    result=dict(variant=variant,fold=fold,seed=42,learning_rate=lr,best_epoch=best_epoch,validation=best_val,test=test,predictions=pred,kwargs=kwargs,checkpoint=str(ckpt.relative_to(HERE)))
     save(result_path,result);report()
     del model,loaders,opt,sched;torch.cuda.empty_cache()
     return result

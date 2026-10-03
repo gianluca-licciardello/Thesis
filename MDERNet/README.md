@@ -25,7 +25,8 @@ python -m pip install -r requirements.txt
 |---|---|
 | Epochs / seed / dropout | 50 / 42 for every fit / 0.0 |
 | Batch size | 64 |
-| Optimizer | SGD, LR 0.01, momentum 0.9, Nesterov, weight decay 0.0001 |
+| Optimizer | SGD, momentum 0.9, Nesterov, weight decay 0.0001 |
+| Initial learning rate | AIDE: 0.01; PPB-Emo: 0.0001 (independent and mixed) |
 | Scheduler | CosineAnnealingWarmRestarts, T_0=5, eta_min=0.00001 |
 | Backbone | Dominik ResNet-18; checked weight mapping; fully fine-tuned |
 | Input | 30 grayscale 112×112 faces; 15 body joints; xyz, original visibility, seven validity-masked bones |

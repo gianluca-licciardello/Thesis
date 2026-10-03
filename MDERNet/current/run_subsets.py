@@ -79,7 +79,7 @@ def main():
         manifest = dict(dataset=key, original=original, subset_sha256=w.digest(subset_path),
             data_manifest_sha256=w.digest(bundle/'data_manifest.json'),
             launcher_sha256=w.digest(Path(__file__)), selection_sha256=w.digest(Path(fixed.__file__)),
-            settings=dict(epochs=50, lr=.01, batch_size=64, seed=42, dropout=0., folds=10),
+            settings=dict(epochs=50, lr=.01 if aide else .0001, batch_size=64, seed=42, dropout=0., folds=10),
             policy='Training-only subset; configuration-first; fixed global validation-selected fusion; retain partial batch when training fold has fewer than 64 clips')
         path = out/'manifest.json'
         if path.exists():
