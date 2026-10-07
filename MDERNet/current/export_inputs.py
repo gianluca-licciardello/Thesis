@@ -17,7 +17,7 @@ def digest(path):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--source-root', type=Path, required=True, help='Original MDERNet directory')
-    p.add_argument('--subset-root', type=Path, required=True, help='Directory containing the three subset JSONs')
+    p.add_argument('--subset-root', type=Path, required=True, help='Directory containing the four subset JSONs')
     p.add_argument('--destination', type=Path, required=True, help='New portable input directory (about 4.6 GiB)')
     args = p.parse_args()
     src = args.source_root.resolve()
@@ -27,7 +27,7 @@ def main():
     files = [(src/'resnet18_dominik.pth', 'resnet18_dominik.pth')]
     for name in ['aide_body.npy', 'ppb_body.npy']:
         files.append((campaign/name, name))
-    for name in ['aide_clean_keypoints_subset.json', 'aide_balanced_subset.json', 'subject_subsets.json']:
+    for name in ['aide_clean_keypoints_subset.json', 'aide_balanced_subset.json', 'subject_subsets.json', 'ppb_emo_clean_keypoints_subset.json']:
         files.append((args.subset_root/name, name))
     for name, cache in [('aide',src/'results_legacy/aide_balanced_dominik_e50_lr001_interpolated/preprocessed'), ('ppb',src/'preprocessed')]:
         files.append((cache/'labels.csv', name+'/labels.csv'))

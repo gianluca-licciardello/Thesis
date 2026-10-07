@@ -14,7 +14,7 @@ w = fixed.worker
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--dataset', required=True, choices=['aide_clean', 'aide_balanced', 'ppb_eeg', 'ppb_epq', 'ppb_cluster'])
+    parser.add_argument('--dataset', required=True, choices=['aide_full', 'aide_clean', 'aide_balanced', 'ppb_full', 'ppb_clean', 'ppb_eeg', 'ppb_epq', 'ppb_cluster'])
     parser.add_argument('--split', choices=['independent', 'mixed'], default='independent')
     parser.add_argument('--output-root', type=Path, default=Path(__file__).resolve().parent.parent/'outputs/current')
     parser.add_argument('--check-only', action='store_true', help='Validate inputs and splits without training or writing outputs')
@@ -29,22 +29,30 @@ def main():
     original = {p.name:w.digest(p) for p in Path(__file__).resolve().parent.glob('*.py')}
     aide = args.dataset.startswith('aide')
     key = args.dataset if aide else args.dataset+'_'+args.split
+    subset_path = None
     if aide:
         df = pd.read_csv(w.AIDE_CACHE/'labels.csv', dtype={'clip_id': str})
-        subset_path = bundle/('aide_clean_keypoints_subset.json' if args.dataset == 'aide_clean' else 'aide_balanced_subset.json')
-        kept = set(json.loads(subset_path.read_text())['kept_clip_ids'])
+        if args.dataset != 'aide_full':
+            subset_path = bundle/('aide_clean_keypoints_subset.json' if args.dataset == 'aide_clean' else 'aide_balanced_subset.json')
+        kept = set(json.loads(subset_path.read_text())['kept_clip_ids']) if subset_path else None
         folds = [te for _, te in StratifiedKFold(10, shuffle=True, random_state=42).split(df, df.discrete_label)]
         splits = []
         for i in range(10):
             tr = np.sort(np.concatenate([folds[j] for j in range(10) if j not in (i, (i+1)%10)]))
-            tr = tr[df.iloc[tr].clip_id.isin(kept).to_numpy()]
+            if kept is not None:
+                tr = tr[df.iloc[tr].clip_id.isin(kept).to_numpy()]
             splits.append((tr, folds[(i+1)%10], folds[i]))
     else:
-        subset_path = bundle/'subject_subsets.json'
+        extra = {}
+        if args.dataset == 'ppb_clean':
+            subset_path = bundle/'ppb_emo_clean_keypoints_subset.json'
+            extra['clean_subset_path'] = str(subset_path)
+        elif args.dataset != 'ppb_full':
+            subset_path = bundle/'subject_subsets.json'
+            extra.update(downsample_train=True, subsets_path=str(subset_path),
+                subset_name={'ppb_eeg':'EEG', 'ppb_epq':'EPQ', 'ppb_cluster':'Cluster'}[args.dataset])
         df, splits = w.build_kfold_splits(preproc_dir=str(w.PPB_CACHE), k_folds=10,
-            mix_subjects=args.split == 'mixed', with_validation=True, random_state=42,
-            downsample_train=True, subsets_path=str(subset_path),
-            subset_name={'ppb_eeg':'EEG', 'ppb_epq':'EPQ', 'ppb_cluster':'Cluster'}[args.dataset])
+            mix_subjects=args.split == 'mixed', with_validation=True, random_state=42, **extra)
     body_path = bundle/('aide_body.npy' if aide else 'ppb_body.npy')
     body = np.load(body_path, mmap_mode='r')
     assert body.shape == (len(df), 30, 15, 4), body.shape
@@ -53,7 +61,8 @@ def main():
     cache = w.AIDE_CACHE if aide else w.PPB_CACHE
     label_path = cache/'labels.csv'
     assert w.digest(label_path) == data_manifest['hashes'][label_path.relative_to(bundle).as_posix()], 'Labels changed'
-    assert w.digest(subset_path) == data_manifest['hashes'][subset_path.relative_to(bundle).as_posix()], 'Subset definition changed'
+    if subset_path is not None:
+        assert w.digest(subset_path) == data_manifest['hashes'][subset_path.relative_to(bundle).as_posix()], 'Subset definition changed'
     for row in df.itertuples():
         clip = row.clip_id if aide else f'{row.participant}_{row.emotion_code}'
         face = cache/'faces'/(clip+'.npy')
@@ -76,7 +85,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     with (out/'run.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
-        manifest = dict(dataset=key, original=original, subset_sha256=w.digest(subset_path),
+        manifest = dict(dataset=key, original=original, subset_sha256=w.digest(subset_path) if subset_path else None,
             data_manifest_sha256=w.digest(bundle/'data_manifest.json'),
             launcher_sha256=w.digest(Path(__file__)), selection_sha256=w.digest(Path(fixed.__file__)),
             settings=dict(epochs=50, lr=.01 if aide else .0001, batch_size=64, seed=42, dropout=0., folds=10),
@@ -120,6 +129,8 @@ def main():
                     result = w.fit(key, fold, 'fixed_best', 'fusion', chosen['kwargs'], df, split)
                 result.update(selected_feb=chosen['feb'], selected_bgb=chosen['bgb'], selection_scope='fixed global mean validation selection')
                 w.save(path, result)
+            from summarize import summarize
+            summarize(folder)
             w.state('complete', experiment=key)
         except Exception as exc:
             w.state('failed', experiment=key, error=repr(exc))

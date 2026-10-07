@@ -1,7 +1,7 @@
 # MDERNet: current AIDE and PPB-Emo experiments
 
 Use `current/run_subsets.py` for AIDE Clean Keypoints, AIDE Balanced, PPB-Emo
-EEG, EPQ, and Cluster. It packages the training/model code from the active
+Full, Clean Keypoints, EEG, EPQ, and Cluster, plus AIDE Full. It packages the training/model code from the active
 September 30 campaign and the configuration-first continuation. The older
 root-level `ablation_aide.py` is retained for historical use and does **not**
 implement this evaluation protocol.
@@ -74,6 +74,7 @@ inputs/
   aide_clean_keypoints_subset.json
   aide_balanced_subset.json
   subject_subsets.json
+  ppb_emo_clean_keypoints_subset.json
   aide_body.npy
   ppb_body.npy
   aide/labels.csv
@@ -179,3 +180,44 @@ run directory; use `--output-root /new/output/location` for a separate run.
 
 The launcher never starts or stops the original campaign services. Avoid
 launching it on a GPU already occupied by the current experiments.
+
+
+## Complete validation-based suite (updated 7 October 2026)
+
+The launcher now supports all 13 dataset/condition combinations:
+
+- AIDE Full, Clean Keypoints and Balanced (stratified clip folds).
+- PPB-Emo Full, Clean Keypoints, EEG, EPQ and Cluster, each with independent
+  and mixed-subject folds.
+
+The same 50-epoch protocol, training-only filtering and validation checkpoint
+selection described above apply throughout. AIDE LR is 0.01; PPB LR is 0.0001.
+The archived root-level ablation scripts are not used by this suite.
+The original AIDE per-fold-selected fusion is not reproduced by this launcher;
+it implements the fixed globally validation-selected fusion for every dataset.
+
+From `MDERNet`, after activating the environment:
+
+```bash
+export MDERNET_INPUTS=/path/to/MDERNet-share-inputs
+export CUDA_VISIBLE_DEVICES=0
+bash current/run_all.sh --check-only
+bash current/run_all.sh --output-root ./outputs/validation_all
+```
+
+The first command validates all 13 combinations without starting training.
+The second executes them sequentially and stops on any failure. The output
+root is separate from earlier runs whose source/input manifests have changed.
+Completed configurations produce per-fold checkpoint/history/prediction files;
+a completed experiment also produces `summary.csv` and `summary.json` under
+`<output-root>/<dataset-and-split>/runs/<dataset-and-split>/`. Summaries are
+unweighted means of test-fold metrics. To summarize partial results manually:
+
+```bash
+python current/summarize.py outputs/validation_all/ppb_full_independent/runs/ppb_full_independent
+```
+
+The updated input bundle includes `ppb_emo_clean_keypoints_subset.json` and its
+manifest hash. Recipients of the older bundle must receive the updated bundle
+(or that additional file together with the updated `data_manifest.json`).
+The input bundle and pretrained weights remain external to GitHub.
