@@ -37,3 +37,13 @@ results*/
 *.pdf
 recovery/
 diagnostics/
+# DECNet prepared inputs and generated artifacts
+annotation/
+frames/
+checkpoint/
+checkpoints/
+log/
+logs/
+*.pkl
+*.pickle
+*.pth.tar

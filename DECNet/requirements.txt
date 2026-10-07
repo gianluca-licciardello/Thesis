@@ -1,0 +1,13 @@
+# DECNet runtime dependencies
+# Install the PyTorch CUDA 12.1 wheels with the extra index below if you want the local GPU stack.
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+torch==2.2.2+cu121
+torchvision==0.17.2+cu121
+torchaudio==2.2.2+cu121
+
+numpy==1.26.4
+pillow==10.1.0
+einops==0.7.0
+matplotlib==3.8.2
+scikit-learn==1.3.2

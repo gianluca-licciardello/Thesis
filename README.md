@@ -1,12 +1,23 @@
-# Thesis
+# Thesis experiment code
 
-[MDERNet setup, exact experiment settings, input bundle, and run commands](MDERNet/README.md)
-for AIDE Full/Clean/Balanced and PPB-Emo Full/Clean/EEG/EPQ/Cluster,
-including independent and mixed PPB evaluation.
+This repository contains runnable model code and setup instructions. Results,
+trained checkpoints, plots, logs and datasets are excluded from Git. Input
+bundles are shared separately.
 
-Run all 13 combinations with `bash current/run_all.sh` from `MDERNet`
-after following the environment and input-bundle instructions.
+| System | Experiments | Instructions |
+|---|---|---|
+| MDERNet | AIDE Full/Clean/Balanced; PPB-Emo Full/Clean/EEG/EPQ/Cluster, independent and mixed | [MDERNet README](MDERNet/README.md) |
+| DECNet | 23 historical configurations: AIDE Full/Balanced/Clean; PPB-Emo five subsets, two modalities and two split conditions | [DECNet README](DECNet/README.md) |
 
-The `MDERNet/current/` package implements the current 50-epoch,
-validation-selected protocol, with LR 0.01 for AIDE and 0.0001 for PPB-Emo. Model weights and dataset inputs are shared
-separately; the README includes an exporter and the full required-file list.
+MDERNet uses the validation-based 50-epoch protocol, with LR 0.01 for AIDE and
+0.0001 for PPB-Emo. Run its complete suite with `bash current/run_all.sh` from
+`MDERNet` after configuring the environment and input bundle.
+
+DECNet uses outer fold 0 and five inner folds, with validation-based selection.
+Its package reruns the historical configurations using available source code;
+exact archived numerical reproduction is not certified because original
+immutable code/input snapshots have not been established. See its README for
+scope, input export and `historical_suite.py` commands.
+
+Each model requires its own input bundle and Python environment. The two
+packages use different PyTorch versions and evaluation protocols.
