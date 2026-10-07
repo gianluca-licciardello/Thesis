@@ -1,0 +1,101 @@
+base_lr: 0.1
+batch_size: 64
+clip_grad_norm: false
+cls_num_list:
+- 200
+- 140
+- 200
+- 170
+- 200
+- 200
+- 150
+config: configs/ppb_emo_fast_sam3d_2d_independent_clean_keypoints/bone_root_1.yaml
+device:
+- 0
+emotion_labels:
+- Anger
+- Disgust
+- Fear
+- Happiness
+- Neutral
+- Sadness
+- Surprise
+eval_batch_size: 1
+eval_feeder_args:
+  bone: true
+  data_path: ./data/PPB_Emo/processed_data_2d_participant_clean_keypoints/eval_data.npy
+  debug: false
+  label_path: ./data/PPB_Emo/processed_data_2d_participant_clean_keypoints/eval_label.pkl
+  p_interval:
+  - 0.95
+  split: eval
+  visibility_channel: true
+  window_size: 16
+eval_interval: 5
+extract: false
+feeder: feeders.feeder_aide.Feeder
+ignore_weights: []
+log_interval: 100
+loss_type: BlvLoss
+lr_decay_rate: 0.1
+lr_ratio: 0.001
+model: model.UbHGCN.Model
+model_args:
+  drop_out: 0.25
+  graph: graph.aide_hierarchy.Graph
+  graph_args:
+    labeling_mode: spatial
+    root: 1
+  num_class: 7
+  num_person: 1
+  num_point: 14
+model_saved_name: ''
+nesterov: true
+num_epoch: 90
+num_worker: 0
+optimizer: SGD
+phase: train
+print_log: true
+save_epoch: 30
+save_interval: 1
+save_score: false
+seed: 1
+show_topk:
+- 1
+- 5
+start_epoch: 0
+step:
+- 20
+- 40
+- 60
+test_batch_size: 1
+test_feeder_args:
+  bone: true
+  data_path: ./data/PPB_Emo/processed_data_2d_participant_clean_keypoints/test_data.npy
+  debug: false
+  label_path: ./data/PPB_Emo/processed_data_2d_participant_clean_keypoints/test_label.pkl
+  p_interval:
+  - 0.95
+  split: test
+  visibility_channel: true
+  window_size: 16
+train_feeder_args:
+  bone: true
+  data_path: ./data/PPB_Emo/processed_data_2d_participant_clean_keypoints/train_data.npy
+  debug: false
+  label_path: ./data/PPB_Emo/processed_data_2d_participant_clean_keypoints/train_label.pkl
+  normalization: false
+  p_interval:
+  - 0.5
+  - 1
+  random_choose: false
+  random_move: false
+  random_rot: false
+  random_shift: false
+  split: train
+  visibility_channel: true
+  window_size: 16
+warm_up_epoch: 5
+weight_decay: 0.0004
+weights: null
+work_dir: work_dir/ppb_emo_fast_sam3d_2d_independent_clean_keypoints/bone_root_1

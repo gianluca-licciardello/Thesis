@@ -1,0 +1,16 @@
+-e ./torchlight
+--extra-index-url https://download.pytorch.org/whl/cu121
+einops
+h5py
+matplotlib
+numpy<2
+scipy
+pyyaml
+scikit-learn
+tensorboardX
+torch==2.2.2+cu121
+torchaudio==2.2.2+cu121
+torchvision==0.17.2+cu121
+tqdm
+torchpack==0.2.2
+# Optional logging integration; install separately in a Python 3.9 env if needed.

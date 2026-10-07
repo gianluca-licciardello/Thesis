@@ -47,3 +47,8 @@ logs/
 *.pkl
 *.pickle
 *.pth.tar
+
+# UbH-GCN generated experiments and logging
+work_dir/
+runs/
+*.tfevents.*
